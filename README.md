@@ -124,7 +124,10 @@ test_rag.py: retrieval y build_hierarchical_context
 test_tools.py: mocks de herramientas MCP
 test_router.py: enrutado entre RAG y tools
 Cobertura mínima: 3 casos de prueba esenciales por flujo.
-Notas
+
+---
+
+## Notas
 El PDF de ejemplo es solo referencia; el sistema permite cualquier PDF con texto seleccionable.
 MCP server y cliente son independientes; se comunican vía SSE y endpoints REST.
 Faltan ajustes finales de UI, que se integrarán sobre la arquitectura existente.
