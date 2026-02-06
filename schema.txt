@@ -1,0 +1,25 @@
+itcl_rag_mcp/
+├─ client/
+│  ├─ app.py             # FastAPI / Streamlit
+│  ├─ router.py          # Enrutado RAG vs Tool
+│  ├─ rag/
+│  │  ├─ index_pdf.py    # Indexa PDF, chunks
+│  │  ├─ retrieval.py    # Recupera contexto jerárquico
+│  │  └─ embeddings.py   # Generación embeddings
+│  └─ utils/
+│     └─ logger.py       # Logs JSON trazables
+├─ mcp_server/
+│  ├─ server.py          # SSE y endpoints para tools
+│  ├─ tools/
+│  │  ├─ fx_rate.py      # Mock determinista
+│  │  └─ market_status.py # Mock determinista
+│  └─ utils.py           # Logs, helpers
+├─ data/
+│  └─ pdf_example.pdf
+├─ tests/
+│  ├─ test_rag.py
+│  ├─ test_tools.py
+│  └─ test_router.py
+├─ docker-compose.yml
+├─ requirements.txt / poetry.lock
+└─ README.md
