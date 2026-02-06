@@ -1,5 +1,7 @@
-from langchain_community.document_loaders import PyPDFLoader
+import argparse
+
 from langchain_chroma import Chroma
+from langchain_community.document_loaders import PyPDFLoader
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from client.rag.embeddings import get_embedding_model
@@ -76,6 +78,18 @@ def build_index(force=False):
     return create_index(chunks)
 
 
+def main():
+    parser = argparse.ArgumentParser(description="Herramientas RAG")
+
+    parser.add_argument("--reindex", action="store_true", help="Reindexa el PDF")
+
+    args = parser.parse_args()
+
+    if args.reindex:
+        build_index(force=True)
+    else:
+        build_index()
+
+
 if __name__ == "__main__":
-    vectorstore = build_index()
-    print(f"VectorStore -> {vectorstore}")
+    main()
