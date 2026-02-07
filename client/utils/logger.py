@@ -1,7 +1,7 @@
 import json
 import logging
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 
 from client.utils.settings import LOG_DIR, LOG_FILE
 
@@ -23,5 +23,5 @@ if not logger.handlers:
 
 def log_event(event: dict, event_type: str = "rag"):
     event["event_type"] = event_type
-    event["timestamp"] = datetime.now(datetime.timezone.utc).isoformat()
+    event["timestamp"] = datetime.now(timezone.utc).isoformat()
     logger.info(json.dumps(event))
