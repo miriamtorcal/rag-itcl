@@ -1,65 +1,80 @@
 import re
 
 from client.rag.index_pdf import load_index
-from client.utils.settings import MAX_CHUNKS_PER_PAGE, SCORE_THRESHOLD
 from client.utils.logger import log_event
+from client.utils.settings import (
+    MAX_PAGES,
+)
 
-def retrieve_chunks(query: str, k: int = 8):
+
+def retrieve_chunks(query, k=10, max_per_page=2):
+    """
+    Recupera chunks diversificados por página.
+    """
     vectorstore = load_index()
-    docs = vectorstore.similarity_search_with_score(query, k=k)
+    results = vectorstore.similarity_search_with_score(query, k=30)
 
-    filtered = [(doc, score) for doc, score in docs if score < SCORE_THRESHOLD]
+    filtered = []
+    per_page_count = {}
 
-    if filtered:
-        filtered_sorted = sorted(filtered, key=lambda x: x[1])
-        return filtered_sorted[:5], {
-            "route": "RAG",
-            "used_lexical_fallback": False
-        }
+    for doc, score in results:
+        page = doc.metadata.get("page")
 
-    fallback = keyword_fallback_retrieval(query, docs)
-    if fallback:
-        return fallback, {
-            "route": "RAG",
-            "used_lexical_fallback": True
-        }
+        if page is None:
+            continue
 
-    return [], {
-            "route": "NONE",
-            "used_lexical_fallback": False
-        }
+        per_page_count.setdefault(page, 0)
+
+        # limitar chunks por página
+        if per_page_count[page] >= max_per_page:
+            continue
+
+        per_page_count[page] += 1
+        filtered.append((doc, score))
+
+        if len(filtered) >= k:
+            break
+
+    return filtered, {
+        "total_candidates": len(results),
+        "returned": len(filtered),
+        "pages": list(per_page_count.keys()),
+    }
 
 
-def build_hierarchical_context(results):
+def _normalize_block(text: str) -> str:
+    """
+    Normaliza un bloque de PDF para deduplicación.
+    """
+    text = text.lower()
+    text = re.sub(r"[◼▪•■]", "", text)  # quitar viñetas
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
+
+
+def build_hierarchical_context(results, max_chunks_per_page=2):
     pages = {}
 
     for doc, score in results:
         page = doc.metadata.get("page")
-        if page not in pages:
-            pages[page] = []
-        pages[page].append(doc.page_content)
+        pages.setdefault(page, [])
+
+        # evita duplicados casi iguales
+        if doc.page_content not in pages[page]:
+            pages[page].append(doc.page_content)
 
     context_blocks = []
     citations = []
 
-    for page in sorted(pages.keys()):
-        texts = pages[page][:MAX_CHUNKS_PER_PAGE]
+    for page in sorted(pages.keys())[:MAX_PAGES]:
+        texts = pages[page][:max_chunks_per_page]
         context_blocks.append(f"\n--- Página {page} ---\n" + "\n".join(texts))
         citations.append(page)
 
     return {
         "context": "\n\n".join(context_blocks),
-        "pages": sorted(citations),
-        "chunks": [
-            {
-                "page": doc.metadata.get("page"),
-                "chunk_id": doc.metadata.get("chunk_id"),
-                "score": score,
-            }
-            for doc, score in results
-        ],
+        "pages": citations,
     }
-
 
 
 def keyword_fallback_retrieval(query: str, docs, max_results=5):
@@ -75,47 +90,46 @@ def keyword_fallback_retrieval(query: str, docs, max_results=5):
     return matched[:max_results]
 
 
-if __name__ == "__main__":
-    query = "notificación de incidentes"
-    print(f"Query 1 -> {query}")
-    results, decision = retrieve_chunks(query)
-    data = build_hierarchical_context(results)
-    log_event({
-        "query": query,
-        "route": decision["route"],
-        "used_lexical_fallback": decision["used_lexical_fallback"],
-        "num_chunks": len(data.get("chunks", [])),
-        "chunks_retrieved": [
-            {"chunk_id": c["chunk_id"], "page": c["page"]}
-            for c in data.get("chunks")
-        ]
-    })
+# if __name__ == "__main__":
+#     query = "notificación de incidentes"
+#     print(f"Query 1 -> {query}")
+#     results, decision = retrieve_chunks(query)
+#     data = build_hierarchical_context(results)
+#     log_event({
+#         "query": query,
+#         "route": decision["route"],
+#         "used_lexical_fallback": decision["used_lexical_fallback"],
+#         "num_chunks": len(data.get("chunks", [])),
+#         "chunks_retrieved": [
+#             {"chunk_id": c["chunk_id"], "page": c["page"]}
+#             for c in data.get("chunks")
+#         ]
+#     })
 
-    print("PÁGINAS:", data["pages"])
-    print("CONTEXTO:", data["context"][:500])
+#     print("PÁGINAS:", data["pages"])
+#     print("CONTEXTO:", data["context"][:500])
 
 
+# query = "el vino en la ribera del duero"
+# print(f"Query 2 -> {query}")
+# results = retrieve_chunks(query)
+# data = build_hierarchical_context(results)
 
-    # query = "el vino en la ribera del duero"
-    # print(f"Query 2 -> {query}")
-    # results = retrieve_chunks(query)
-    # data = build_hierarchical_context(results)
+# print("PÁGINAS:", data["pages"])
+# print("CONTEXTO:", data["context"][:500])
 
-    # print("PÁGINAS:", data["pages"])
-    # print("CONTEXTO:", data["context"][:500])
+# query = "ataque POODLE"
+# print(f"Query 3 -> {query}")
+# results = retrieve_chunks(query)
+# data = build_hierarchical_context(results)
 
-    # query = "ataque POODLE"
-    # print(f"Query 3 -> {query}")
-    # results = retrieve_chunks(query)
-    # data = build_hierarchical_context(results)
+# print("PÁGINAS:", data["pages"])
+# print("CONTEXTO:", data["context"][:500])
 
-    # print("PÁGINAS:", data["pages"])
-    # print("CONTEXTO:", data["context"][:500])
+# query = "que es un ataque POODLE"
+# print(f"Query 4 -> {query}")
+# results = retrieve_chunks(query)
+# data = build_hierarchical_context(results)
 
-    # query = "que es un ataque POODLE"
-    # print(f"Query 4 -> {query}")
-    # results = retrieve_chunks(query)
-    # data = build_hierarchical_context(results)
-
-    # print("PÁGINAS:", data["pages"])
-    # print("CONTEXTO:", data["context"][:500])
+# print("PÁGINAS:", data["pages"])
+# print("CONTEXTO:", data["context"][:500])

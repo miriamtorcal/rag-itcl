@@ -17,7 +17,7 @@ def load_pdf():
 
 def chunking(docs):
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=400, chunk_overlap=80, separators=["\n\n", "\n", ".", " ", ""]
+        chunk_size=500, chunk_overlap=100, separators=["\n\n", "\n", ".", " ", ""]
     )
 
     chunked_docs = []

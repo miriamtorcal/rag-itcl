@@ -23,5 +23,6 @@ if not logger.handlers:
 
 def log_event(event: dict, event_type: str = "rag"):
     event["event_type"] = event_type
+    event["component"] = "CLIENT"
     event["timestamp"] = datetime.now(timezone.utc).isoformat()
     logger.info(json.dumps(event))
