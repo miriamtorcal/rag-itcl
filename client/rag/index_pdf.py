@@ -28,13 +28,18 @@ def chunking(docs):
         splits = splitter.split_text(doc.page_content)
 
         for i, chunk in enumerate(splits):
+            start = doc.page_content.find(chunk)
+            end = start + len(chunk)
+
             chunked_docs.append(
                 {
                     "text": chunk,
                     "metadata": {
                         "page": page,
                         "chunk_id": f"p{page}_c{i}",
-                        "source": "incibe_ciberincidentes.pdf",
+                        "source": FILE_PATH.name,
+                        "char_start": start,
+                        "char_end": end,
                     },
                 }
             )

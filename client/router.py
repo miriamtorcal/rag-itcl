@@ -283,8 +283,11 @@ def is_ambiguous(query: str) -> bool:
     Si es una query de conversión pero no detecta moneda explícita -> AMBIGUOUS
     """
     q = query.lower()
-    if "convierte" in q and get_target_currency(query) is None:
-        return True
+    # Conversión pero sin moneda destino explícita
+    if "convierte" in q or "cuando" in q:
+        if get_target_currency(query) is None:
+            return True
+    # Resumen pero no es documento
     if "resumen" in q and not is_document_query(query):
         return True
     return False

@@ -14,7 +14,6 @@ MAX_PAGES = int(env_settings.get("MAX_PAGES"))
 SCORE_THRESHOLD = float(env_settings.get("SCORE_THRESHOLD"))
 LOG_DIR = env_settings.get("LOG_DIR")
 LOG_FILE = env_settings.get("LOG_FILE")
-ROUTER_LLM_MODEL = env_settings.get("ROUTER_LLM_MODEL")
 MCP_URL = env_settings.get("MCP_URL")
 
 
