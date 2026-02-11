@@ -1,134 +1,388 @@
 # Asistente Conversacional con RAG Jerárquico y Soporte MCP
 
-Asistente conversacional diseñado para responder preguntas sobre un PDF de referencia con citación de páginas y fragmentos, y con posibilidad de llamada a herramientas externas (MCP) vía SSE.  
-El sistema combina **RAG jerárquico**, **fallback léxico**, **logs trazables** y **arquitectura modular** para asegurar correctitud, reproducibilidad y mantenibilidad.
+Asistente conversacional diseñado para responder preguntas sobre un PDF de referencia con citación de páginas y soporte para herramientas externas vía **MCP (Model Context Protocol)** mediante **SSE** para la ejecución de tools.
+
+El sistema combina:
+
+- ✅ RAG jerárquico con citación por página  
+- ✅ Fallback léxico controlado  
+- ✅ Orquestador RAG / TOOL / BOTH / NONE  
+- ✅ Tools deterministas vía MCP  
+- ✅ Logs estructurados y trazables  
+- ✅ Arquitectura modular y reproducible con Docker  
 
 ---
 
 ## Tabla de Contenidos
 
-- [Estructura de carpetas](#estructura-de-carpetas)  
+- [Arquitectura General](#arquitectura-general)  
+- [Estructura del Proyecto](#estructura-del-proyecto)  
 - [Requisitos](#requisitos)  
-- [Ejecución](#ejecución)  
-- [Chunking y embeddings](#chunking-y-embeddings)  
-- [Recuperación de contexto jerárquico](#recuperación-de-contexto-jerárquico)  
-- [Fallback léxico](#fallback-léxico)  
-- [Logs y trazabilidad](#logs-y-trazabilidad)  
+- [Configuración](#configuración)  
+- [Ejecución con Docker](#ejecución-con-docker)  
+- [Chunking y Embeddings](#chunking-y-embeddings)  
+- [Recuperación Jerárquica](#recuperación-jerárquica)  
+- [Fallback Léxico](#fallback-léxico)  
+- [Estrategia de Enrutado](#estrategia-de-enrutado)  
+- [Logs y Trazabilidad](#logs-y-trazabilidad)  
+- [Limitaciones y Decisiones de Diseño](#limitaciones-y-decisiones-de-diseño)  
 - [Tests](#tests)  
-- [Notas](#notas)  
-
+- [Resultados Probados](#resultados)  
+- [Conclusión](#conclusión)
 ---
 
-## Estructura de carpetas
+## Arquitectura General
+
+El sistema está dividido en dos servicios independientes:
+
+### 1️⃣ Client (Streamlit + RAG + Router)
+
+**Responsabilidades:**
+
+- Indexación del PDF  
+- Generación de embeddings  
+- Recuperación semántica  
+- Fallback léxico  
+- Orquestación RAG / TOOL / BOTH / NONE  
+- Cálculo en conversiones (ej. cifras + tipo de cambio)  
+- Logging estructurado  
+- Interfaz de usuario  
+
+**Incluye:**
+
+- Dockerfile propio  
+- `requirements.txt` propio  
+
+### 2️⃣ MCP Server (FastAPI)
+
+**Responsabilidades:**
+
+- Exposición de herramientas externas  
+- Ejecución de tools deterministas vía SSE  
+- Registro independiente de logs  
+
+**Incluye:**
+
+- Dockerfile propio  
+- `requirements.txt` propio  
+
+**Notas sobre MCP y SSE:**
+
+- Las tool calls se realizan vía **SSE**, garantizando comunicación asíncrona y trazable.  
+- El cliente obtiene la lista de herramientas mediante endpoint REST (`GET /tools`) al iniciar, evitando hardcodear nombres en el cliente.  
+- La ejecución de cada tool se solicita vía POST (`/call/<tool>`), recibiendo resultados de manera trazable.  
+
+```text
+Usuario
+   |
+Client (UI + Router + RAG)
+   |      
+   +--------+
+   |        |
+VectorStore  MCP Server (Tools SSE)
+(Chroma)        |
+            Tools Mock
+           fx_rate / market_status
+```
+---
+
+## Estructura del Proyecto
 
 ```text
 rag_itcl/
 ├─ client/
-│  ├─ app.py              # FastAPI / Streamlit
-│  ├─ router.py           # Orquestador RAG vs Tool
+│  ├─ Dockerfile
+│  ├─ requirements.txt
+│  ├─ app.py
+│  ├─ router.py
+│  ├─ mcp/
+│  │  └─ discovery.py
 │  ├─ rag/
-│  │  ├─ index_pdf.py     # Indexa PDF y chunks
-│  │  ├─ retrieval.py     # Recupera contexto jerárquico y fallback
-│  │  └─ embeddings.py    # Generación de embeddings
+│  │  ├─ index_pdf.py
+│  │  ├─ retrieval.py
+│  │  └─ embeddings.py
 │  └─ utils/
-│     ├─ logger.py        # Logs JSON trazables
-│     └─ settings.py      # Configuraciones (paths, thresholds, etc.)
+│     ├─ logger.py
+│     └─ settings.py
+│
 ├─ mcp_server/
-│  ├─ server.py           # Exposición de tools vía SSE / endpoints
+│  ├─ Dockerfile
+│  ├─ requirements.txt
+│  ├─ server.py
 │  ├─ tools/
-│  │  ├─ fx_rate.py       # Mock determinista de tool
-│  │  └─ market_status.py # Mock determinista de tool
-│  └─ utils.py            # Helpers para logs y herramientas
+│  │  ├─ fx_rate.py
+│  │  └─ market_status.py
+│  ├─ logger.py
+│  └─ utils.py
+│
 ├─ data/
-│  ├─ pdf_example.pdf     # PDF de referencia
-│  └─ vector/             # VectorStore persistente
+│  ├─ pdf_example.pdf
+│  └─ vector/
+│
 ├─ tests/
 │  ├─ test_rag.py
 │  ├─ test_tools.py
 │  └─ test_router.py
+├─ logs/
+│  └─ app.log
 ├─ docker-compose.yml
-├─ requirements.txt / poetry.lock
+├─ .env
 └─ README.md
 ```
-
-
 ---
 
 ## Requisitos
+**Docker**
 
-- Python ≥ 3.12  
-- Docker + Docker Compose  
-- Librerías: `langchain`, `sentence-transformers`, `Chroma`, `FastAPI`, `Streamlit`  
-- Variables de entorno configuradas según `.env.example`  
+**Docker Compose**
+
+**Python ≥ 3.12 (solo si se ejecuta sin Docker)**
+
+### Dependencias principales:
+
+```bash
+pip install langchain
+pip install sentence-transformers
+pip install chromadb
+pip install fastapi
+pip install streamlit
+```
+
+Cada servicio tiene su propio entorno aislado vía Docker.
 
 ---
+## Configuración
 
-## Ejecución
+Variables de entorno en .env:
 
-1. Construir y levantar contenedores:
+```text
+FILE_PATH="guia_incibe_gestion_ciberdelincuentes.pdf"
+VECTORSTORE_PATH="vector"
+LOG_DIR="logs"
+LOG_FILE="app.log"
+EMBEDDING_MODEL="sentence-transformers/all-MiniLM-L6-v2"
+SCORE_THRESHOLD=0.7
+MAX_PAGES=3
+MCP_URL="http://mcp_server:8081"
+```
 
+
+Las rutas se resuelven automáticamente dentro del volumen data/.
+
+---
+## Ejecución con Docker
+
+Construcción y arranque:
 ```bash
 docker compose up --build
 ```
 
-2. Abrir la UI:
+Esto levanta:
 
+client → http://localhost:8501
+
+mcp_server → http://localhost:8081
+
+**Reindexar manualmente:**
 ```bash
-http://localhost:8501
+docker compose exec client python -m client.rag.index_pdf --reindex
+```
+El índice se guarda en `data/vector/`.
+
+---
+
+## Chunking y Embeddings
+
+- **Splitter:** `RecursiveCharacterTextSplitter`  
+- **Tamaño:** ~800 caracteres  
+- **Solapamiento:** 150 caracteres  
+- **Metadatos por chunk:** `page`, `chunk_id`, `source`  
+- **Embeddings:** `sentence-transformers/all-MiniLM-L6-v2`  
+- **VectorStore:** Chroma persistente  
+- Evita recalcular embeddings si ya existen  
+
+---
+
+## Recuperación Jerárquica
+
+**Flujo de trabajo:**
+
+```python
+similarity_search_with_score(query)
+# Filtrado por SCORE_THRESHOLD
+# Agrupación por página
+# Reconstrucción limitada por MAX_PAGES
 ```
 
-3. Para reindexar el PDF:
+**Ventajas:**
 
-```bash
-python -m client.rag.index_pdf --reindex
-```
----
-
-## Chunking y embeddings
-Se utiliza RecursiveCharacterTextSplitter para generar chunks de ~800 caracteres con solapamiento de 150.
-Cada chunk contiene metadatos: page, chunk_id, source.
-Los embeddings se generan en embeddings.py usando sentence-transformers (all-MiniLM-L6-v2) y se almacenan en data/vector/.
-El índice se persiste con Chroma local, evitando recalcular embeddings.
+- Coherencia contextual  
+- No se inyecta el PDF completo  
+- Citación clara por página  
 
 ---
 
-## Recuperación de contexto jerárquico
-retrieve_chunks(query) realiza búsqueda semántica con similarity_search_with_score.
-Se filtra según SCORE_THRESHOLD para asegurar solo resultados relevantes.
-build_hierarchical_context(results) reconstruye el contexto agrupando por página y limitando a MAX_CHUNKS_PER_PAGE.
-Devuelve contexto concatenado, páginas citadas y metadatos de chunks.
-Fallback léxico
-Si ningún resultado supera el threshold semántico, se activa keyword_fallback_retrieval(query, docs).
-Extrae keywords significativas de la query (≥4 caracteres) y busca coincidencias textuales en los chunks.
-Permite recuperar información que la búsqueda semántica no encuentra pero sí existe en el PDF.
+## Fallback Léxico
+
+- Activado si ningún chunk supera el umbral semántico  
+- Búsqueda por keywords significativas  
+- Resultados se registran en logs: `"used_lexical_fallback": true`  
 
 ---
 
-## Logs y trazabilidad
-Todas las consultas se registran en client/utils/logger.py.
-Campos logueados:
+## Estrategia de Enrutado
+
+El router clasifica cada consulta en:
+
+| Consulta                                   | Ruta       |
+|-------------------------------------------|-----------|
+| ¿Qué es el Producto Interior Bruto?       | RAG       |
+| ¿Cuándo bajó el USD?                       | AMBIGUOUS |
+| Convierte el Producto Interior Bruto a USD| BOTH      |
+| ¿Capital de Marte?                         | NONE      |
+
+---
+
+## Logs y Trazabilidad
+
+**Formato JSON de ejemplo:**
+
+```json
 {
   "timestamp": "ISO UTC",
-  "query": "texto de consulta",
-  "route": "RAG | TOOL | BOTH",
-  "chunks_retrieved": [{"chunk_id": "...", "page": 0, "score": 0.123}],
-  "used_lexical_fallback": true|false
+  "query": "...",
+  "route": "RAG | TOOL | BOTH | NONE | AMBIGUOUS",
+  "chunks_retrieved": [{"chunk_id": "...", "page": 3, "score": 0.82}],
+  "tool_calls": [{"name": "fx_rate", "duration_ms": 31}],
+  "used_lexical_fallback": false
 }
-Logs en pantalla y archivo JSON, trazables para depuración.
+```
+- **Ubicación de logs:** `logs/app.log`  
+
+**Garantiza:**
+
+- Reproducibilidad  
+- Observabilidad  
+- Auditoría de decisiones  
+
+---
+
+## Limitaciones y Decisiones de Diseño
+
+- **PDF con texto seleccionable:** No se implementa OCR. PDFs escaneados no serán indexados.  
+- **Extracción numérica:** Se priorizan magnitudes grandes y se valida proximidad semántica.  
+- **Conversión desacoplada (RAG + Tool):** RAG obtiene cifra y moneda, tool aporta tipo de cambio.  
+- **Ambigüedad en símbolos monetarios:** $ → USD, € → EUR. Se recomienda usar códigos ISO.  
+- **Recuperación limitada:** Solo se reconstruyen hasta `MAX_PAGES` páginas relevantes.  
+- **Tools deterministas:** No dependen de internet; garantizan ejecución offline completa.  
+- **Acrónimos aislados:** Consultas muy cortas con acrónimos (ej. P.I.B. o PIB) pueden fallar. Se aplica query expansion: P.I.B. → Producto Interior Bruto.
 
 ---
 
 ## Tests
-Tests mínimos implementados en tests/:
-test_rag.py: retrieval y build_hierarchical_context
-test_tools.py: mocks de herramientas MCP
-test_router.py: enrutado entre RAG y tools
-Cobertura mínima: 3 casos de prueba esenciales por flujo.
+
+- **Ubicación:** `tests/`  
+- **Cubren:**  
+  - Recuperación con citación  
+  - Activación de fallback  
+  - Enrutado correcto  
+  - Ejecución de tools  
+  - Caso NONE
+
+---
+## Resultados Probados
+
+A continuación se muestran consultas reales ejecutadas sobre el sistema antes de la entrega, indicando la ruta de resolución activada y la fuente utilizada.
+
+### 🔎 Casos RAG (solo PDF)
+
+| Consulta | Resultado Resumido | Ruta |
+|----------|-------------------|------|
+| ¿Qué es la notificación de incidentes? | Definición de notificación inicial e intermedia, con referencia a la ventana temporal y nivel de impacto | RAG |
+| Resumen de la notificación de incidentes | Carácter potestativo y voluntario; información a notificar en la notificación final | RAG |
+
+**Fuente:** PDF indexado (citaciones por página incluidas en la respuesta).
 
 ---
 
-## Notas
-El PDF de ejemplo es solo referencia; el sistema permite cualquier PDF con texto seleccionable.
-MCP server y cliente son independientes; se comunican vía SSE y endpoints REST.
-Faltan ajustes finales de UI, que se integrarán sobre la arquitectura existente.
-Documentación técnica completa y README permiten reproducibilidad inmediata con Docker Compose.
+### 🔧 Casos BOTH (PDF + Tool)
+
+| Consulta | Resultado Resumido | Ruta |
+|----------|-------------------|------|
+| Convierte el Producto Interior Bruto del documento a USD | Extrae 1,163,663,000,000 EUR del PDF y aplica tipo de cambio EUR/USD | BOTH |
+| Convierte el Producto Interior Bruto del documento a JPY | Extrae valor del PDF y aplica tipo de cambio EUR/JPY | BOTH |
+
+**Flujo aplicado:**
+
+1. RAG recupera la cifra del documento  
+2. Tool `fx_rate` devuelve el tipo de cambio  
+3. El client calcula la conversión final  
+4. Se registra trazabilidad en logs  
+
+---
+
+### 🌐 Casos TOOL (solo herramientas externas)
+
+| Consulta | Resultado | Ruta |
+|----------|----------|------|
+| ¿Está cerrado Nasdaq? | Estado del mercado obtenido vía `market_status` | TOOL |
+| ¿Está abierto el mercado de Tokio? | Estado del mercado obtenido vía `market_status` | TOOL |
+| ¿Cuánto vale el PIB en USD? | Tipo de cambio obtenido vía `fx_rate` | TOOL |
+
+**Nota:** Las tools son deterministas y no dependen de conexión a internet.
+
+---
+
+### 🚫 Casos NONE (fuera de alcance)
+
+| Consulta | Resultado | Ruta |
+|----------|----------|------|
+| ¿Qué hora es? | No disponible en PDF ni tools | NONE |
+| ¿Ha llovido hoy? | No disponible en PDF ni tools | NONE |
+
+El sistema evita generar respuestas inventadas cuando no existe fuente válida.
+
+---
+
+## Consideraciones sobre Ambigüedad
+
+Existen consultas que pueden resultar ambiguas debido a:
+
+- Falta de contexto suficiente (ej. "Convierte dinero a USD")
+- Acrónimos aislados (ej. "PIB")
+- Uso implícito de moneda base no especificada
+
+En estos casos el router puede clasificar como:
+
+- `AMBIGUOUS`
+- `TOOL`
+- `BOTH`
+
+dependiendo del análisis heurístico implementado.
+
+---
+
+## Garantías de Reproducibilidad
+
+Todos los resultados anteriores se obtienen ejecutando:
+
+```bash
+docker compose up --build
+```
+---
+## Conclusión
+
+El sistema implementa una arquitectura modular, trazable y reproducible, basada en:
+
+- RAG jerárquico con citación  
+- Orquestación híbrida RAG + Tools  
+- Logging estructurado  
+- Separación clara client / mcp_server  
+- Docker Compose reproducible  
+
+**Se priorizan:**
+
+- Correctitud  
+- Transparencia  
+- Reproducibilidad  
+- Mantenibilidad
