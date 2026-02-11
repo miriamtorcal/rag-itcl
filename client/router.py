@@ -5,6 +5,10 @@ import requests
 from client.rag.retrieval import retrieve_chunks, build_hierarchical_context
 from client.utils.settings import MCP_URL
 
+from client.mcp.discovery import get_available_tools
+
+AVAILABLE_TOOLS = get_available_tools()
+
 
 def base_response():
     return {
@@ -68,16 +72,22 @@ def get_target_currency(query: str, default=None):
 
 def detect_tool(query: str):
     q = query.lower()
-    if any(k in q for k in ["abierto", "cerrado", "bolsa", "mercado"]):
-        return "market_status"
-    if any(k in q for k in ["convertir", "divisa", "moneda", "eur", "usd", "€", "$"]):
-        return "fx_rate"
+    if "market_status" in AVAILABLE_TOOLS:
+        if any(k in q for k in ["abierto", "cerrado", "bolsa", "mercado"]):
+            return "market_status"
+
+    if "fx_rate" in AVAILABLE_TOOLS:
+        if any(
+            k in q for k in ["convertir", "convierte", "divisa", "moneda", "eur", "usd", "€", "$"]
+        ):
+            return "fx_rate"
+
     return None
 
 
 def extract_market_args(query: str):
     words = re.findall(r"[A-Za-z]{3,}", query)
-    stop = {"esta", "está", "abierto", "cerrado", "el", "la", "de", "en"}
+    stop = {"esta", "está", "abierto", "abierta", "cerrado", "cerrada", "el", "la", "de", "en"}
     candidates = [w for w in words if w.lower() not in stop]
     return {"market": candidates[-1].lower()} if candidates else {"market": "default"}
 
@@ -86,6 +96,7 @@ def extract_fx_args(query: str):
     candidates = re.findall(r"\b[A-Z]{3}\b", query.upper())
     base = candidates[0] if len(candidates) > 0 else "EUR"
     quote = candidates[1] if len(candidates) > 1 else "USD"
+    print(f"Base -> {base} Quote -> {quote}")
     return {"base": base, "quote": quote}
 
 
@@ -196,6 +207,7 @@ def handle_rag(query: str):
 def summarize(context: dict, query: str):
     text = context["context"]
     pages = context["pages"]
+
     keywords = set(w.lower() for w in re.findall(r"\w+", query) if len(w) > 4)
     sentences = re.split(r"(?<=[.!?])\s+", text)
 
@@ -206,14 +218,28 @@ def summarize(context: dict, query: str):
             score = sum(1 for kw in keywords if kw in s_clean.lower())
             if score > 0:
                 scored.append((score, s_clean))
+
     scored.sort(key=lambda x: x[0], reverse=True)
-    selected = [s for _, s in scored[:6]] or sentences[:4]
-    bullets = "\n".join(f"- {s}" for s in selected)
-    bullets += "\n\n" + "\n".join(f"(p. {p})" for p in pages[:3])
-    bullets = re.sub(r"--- Página \d+ ---", "", bullets)
-    bullets = re.sub(r"-\s*\n+", "", bullets)
-    bullets = re.sub(r"\n{3,}", "\n\n", bullets)
-    return bullets
+    selected = [s for _, s in scored[:5]] or sentences[:4]
+
+    # 🧼 Limpieza adicional
+    cleaned = []
+    for s in selected:
+        s = re.sub(r"[◼\*\-]+", "", s)
+        s = re.sub(r"\s{2,}", " ", s)
+        s = s.strip()
+        if len(s) > 40:
+            cleaned.append(s)
+
+    summary = "Resumen:\n"
+    summary += "\n".join(f"- {s}" for s in cleaned[:5])
+
+    if pages:
+        unique_pages = sorted(set(pages))[:3]
+        pages_str = ", ".join(str(p) for p in unique_pages)
+        summary += f"\n\nFuentes: p. {pages_str}"
+
+    return summary
 
 
 def answer_factual(context: dict):
@@ -297,11 +323,15 @@ def is_ambiguous(query: str) -> bool:
 
 
 def handle_query(query: str):
+    if AVAILABLE_TOOLS == []:
+        print("Hola")
+        AVAILABLE_TOOLS == get_available_tools()
     resp = base_response()
     tool = detect_tool(query)
     doc = is_document_query(query)
     target_currency = get_target_currency(query)  # moneda objetivo
 
+    resp["debug"]["available_tools"] = AVAILABLE_TOOLS
     resp["debug"]["tool_detected"] = tool
     resp["debug"]["doc_query"] = doc
     resp["debug"]["target_currency"] = target_currency
