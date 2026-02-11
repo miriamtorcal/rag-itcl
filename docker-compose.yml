@@ -1,0 +1,31 @@
+version: "3.12"
+
+services:
+  mcp_server:
+    build:
+      context: ./mcp_server
+    container_name: mcp_server
+    ports:
+      - "8081:8081"
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+      - ./mcp_server:/app/mcp_server
+    environment:
+      - PYTHONPATH=/app
+    restart: unless-stopped
+
+  client:
+    build:
+      context: ./client
+    container_name: rag_client
+    ports:
+      - "8501:8501"
+    depends_on:
+      - mcp_server
+    volumes:
+      - ./:/app
+    environment:
+      - MCP_URL=http://mcp_server:8081
+      - PYTHONPATH=/app
+    restart: unless-stopped
