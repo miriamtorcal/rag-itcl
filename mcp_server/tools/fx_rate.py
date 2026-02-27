@@ -1,27 +1,40 @@
-from datetime import datetime, timezone
-from mcp_server.utils import stable_int
+# rag-itcl/mcp_server/tools/fx_rate.py
+import time
+from pydantic import BaseModel
+from mcp_server.logger import log_event
 
-def fx_rate_handler(base, quote):
-    # valor mock realista: 0.5 – 1.5
-    rate = 0.5 + stable_int(f"{base}:{quote}", 100) / 100
-    return {
-        "base": base,
-        "quote": quote,
-        "rate": round(rate, 2),
-        "as_of": datetime.now(timezone.utc).isoformat()
+# -----------------------------
+# Input Model ordenado y profesional
+# -----------------------------
+class FxRateInput(BaseModel):
+    base: str  # moneda base, ejemplo: "EUR"
+    quote: str  # moneda destino, ejemplo: "USD"
+
+# -----------------------------
+# Tool
+# -----------------------------
+def fx_rate(input: FxRateInput) -> dict:
+    start = time.time()
+    # lógica de ejemplo
+    result = {
+        "base": input.base,
+        "quote": input.quote,
+        "rate": 1.08,  # valor de ejemplo
+        "as_of": "2026-01-01T00:00:00Z",
     }
+    duration = time.time() - start
 
+    # logging profesional
+    log_event({
+        "tool": "fx_rate",
+        "args": {"base": input.base, "quote": input.quote},
+        "duration": duration,
+        "status": "ok"
+    })
+    return result
 
-TOOL = {
-    "name": "fx_rate",
-    "description": "Obtiene tipo de cambio para un par base/quote",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "base": {"type": "string"},
-            "quote": {"type": "string"},
-        },
-    },
-    "required": ["base", "quote"],
-    "handler": lambda base, quote: fx_rate_handler(base, quote),
-}
+# Flag para habilitar/deshabilitar dinámicamente
+fx_rate.enabled = True
+
+# Para registro dinámico en server.py
+__all__ = ["fx_rate"]

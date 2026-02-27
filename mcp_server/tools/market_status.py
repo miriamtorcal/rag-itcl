@@ -1,21 +1,37 @@
-import random
-from datetime import datetime,timezone
+# rag-itcl/mcp_server/tools/market_status.py
+import time
+from pydantic import BaseModel
+from mcp_server.logger import log_event
 
-from mcp_server.utils import stable_int
+# -----------------------------
+# Input Model profesional
+# -----------------------------
+class MarketStatusInput(BaseModel):
+    market: str  # Identificador del mercado, ejemplo: "NASDAQ"
 
-TOOL = {
-    "name": "market_status",
-    "description": "Consulta si un mercado está abierto",
-    "input_schema": {
-        "type": "object",
-        "properties": {
-            "market": {"type":"string"}
-        }
-    },
-    "required": ["market"],
-    "handler": lambda market: {
-        "market": market,
-        "is_open": stable_int(market, 2) == 1,
-        "as_of": datetime.now(timezone.utc).isoformat()
+# -----------------------------
+# Tool
+# -----------------------------
+def market_status(input: MarketStatusInput) -> dict:
+    start = time.time()
+    result = {
+        "market": input.market,
+        "is_open": True,  # mock de estado
+        "as_of": "2026-01-01T10:00:00Z"
     }
-}
+    duration = time.time() - start
+
+    # logging profesional
+    log_event({
+        "tool": "market_status",
+        "args": {"market": input.market},
+        "duration": duration,
+        "status": "ok"
+    })
+    return result
+
+# Flag para habilitar/deshabilitar dinámicamente
+market_status.enabled = True
+
+# Para registro dinámico en server.py
+__all__ = ["market_status"]

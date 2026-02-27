@@ -12,5 +12,7 @@ COPY . .
 # PYTHONPATH para imports con "mcp_server.*"
 ENV PYTHONPATH=/app
 
+EXPOSE 8081
+
 # Ejecutar server
-CMD ["uvicorn", "mcp_server.server:app", "--host", "0.0.0.0", "--port", "8081"]
+CMD ["python", "-m", "mcp_server.server"]
