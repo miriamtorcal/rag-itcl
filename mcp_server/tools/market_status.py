@@ -1,17 +1,12 @@
-# rag-itcl/mcp_server/tools/market_status.py
 import time
 from pydantic import BaseModel
 from mcp_server.logger import log_event
 
-# -----------------------------
 # Input Model profesional
-# -----------------------------
 class MarketStatusInput(BaseModel):
-    market: str  # Identificador del mercado, ejemplo: "NASDAQ"
+    market: str
 
-# -----------------------------
 # Tool
-# -----------------------------
 def market_status(input: MarketStatusInput) -> dict:
     start = time.time()
     result = {

@@ -1,18 +1,13 @@
-# rag-itcl/mcp_server/tools/fx_rate.py
 import time
 from pydantic import BaseModel
 from mcp_server.logger import log_event
 
-# -----------------------------
 # Input Model ordenado y profesional
-# -----------------------------
 class FxRateInput(BaseModel):
     base: str  # moneda base, ejemplo: "EUR"
     quote: str  # moneda destino, ejemplo: "USD"
 
-# -----------------------------
 # Tool
-# -----------------------------
 def fx_rate(input: FxRateInput) -> dict:
     start = time.time()
     # lógica de ejemplo
