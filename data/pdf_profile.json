@@ -1,0 +1,15 @@
+{
+  "identidad": "Gestión de ciberincidentes",
+  "capacidades_rag": [
+    "Gestión de ciberincidentes",
+    "Análisis de estados y valores de cierre",
+    "Uso de tablas y porcentajes"
+  ],
+  "fronteras_negativas": [
+    "Gestión de incidentes de seguridad informática",
+    "Análisis de vulnerabilidades",
+    "Protección de la información"
+  ],
+  "metricas": "Tablas y porcentajes",
+  "instruccion_router": "No aplicable"
+}

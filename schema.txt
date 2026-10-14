@@ -13,7 +13,8 @@ itcl_rag_mcp/
 │  ├─ tools/
 │  │  ├─ fx_rate.py      # Mock determinista
 │  │  └─ market_status.py # Mock determinista
-│  └─ utils.py           # Logs, helpers
+│  ├─ logger.py          # Logs
+│  └─ utils.py           # Helpers
 ├─ data/
 │  └─ pdf_example.pdf
 ├─ tests/

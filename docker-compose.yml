@@ -1,31 +1,58 @@
-version: "3.12"
-
 services:
   mcp_server:
     build:
       context: ./mcp_server
     container_name: mcp_server
     ports:
-      - "8081:8081"
+      - "8000:8000"
+    networks:
+      - rag_net
+
+  ollama:
+    build:
+      context: ./ollama
+      dockerfile: Dockerfile
+    container_name: ollama
+    ports:
+      - "11434:11434"
     volumes:
-      - ./data:/app/data
-      - ./logs:/app/logs
-      - ./mcp_server:/app/mcp_server
-    environment:
-      - PYTHONPATH=/app
-    restart: unless-stopped
+      - ollama_data:/root/.ollama
+    networks:
+      - rag_net
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 15s
+      timeout: 10s
+      retries: 20
 
   client:
     build:
       context: ./client
+      dockerfile: Dockerfile
     container_name: rag_client
     ports:
       - "8501:8501"
     depends_on:
-      - mcp_server
+      ollama:
+        condition: service_healthy
+      mcp_server:
+        condition: service_started
     volumes:
-      - ./:/app
+      - ./data:/app/data
+      - ./client:/app/client
+      - ./logs:/app/logs
+    env_file:
+      - .env
     environment:
-      - MCP_URL=http://mcp_server:8081
+      - OLLAMA_URL=http://ollama:11434/api/generate
+      - MCP_URL=http://mcp_server:8000/sse
       - PYTHONPATH=/app
-    restart: unless-stopped
+    networks:
+      - rag_net
+
+networks:
+  rag_net:
+    driver: bridge
+
+volumes:
+  ollama_data:

@@ -10,7 +10,7 @@
             "name": "Python Debugger: Module",
             "type": "debugpy",
             "request": "launch",
-            "module": "client.rag.retrieval"
+            "module": "mcp_server.utils"
         },
         {
             "name": "Python Debugger: Current File",

@@ -1,20 +1,22 @@
 from pathlib import Path
 from dotenv import dotenv_values
+import os
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 
-env_settings = dotenv_values(PROJECT_ROOT / ".env")
+env_settings = dotenv_values(".env")
 
 DATA_DIR = PROJECT_ROOT / "data"
 
-FILE_PATH = env_settings.get("FILE_PATH")
-VECTORSTORE_PATH = env_settings.get("VECTORSTORE_PATH")
-EMBEDDING_MODEL = env_settings.get("EMBEDDING_MODEL")
-MAX_PAGES = int(env_settings.get("MAX_PAGES"))
-SCORE_THRESHOLD = float(env_settings.get("SCORE_THRESHOLD"))
-LOG_DIR = env_settings.get("LOG_DIR")
-LOG_FILE = env_settings.get("LOG_FILE")
-MCP_URL = env_settings.get("MCP_URL")
+FILE_PATH = os.getenv("FILE_PATH")
+VECTORSTORE_PATH = os.getenv("VECTORSTORE_PATH")
+EMBEDDING_MODEL = os.getenv("EMBEDDING_MODEL")
+MAX_PAGES = int(os.getenv("MAX_PAGES"))
+SCORE_THRESHOLD = float(os.getenv("SCORE_THRESHOLD"))
+LOG_DIR = os.getenv("LOG_DIR")
+LOG_FILE = os.getenv("LOG_FILE")
+MCP_URL = os.getenv("MCP_URL")
+OLLAMA_URL = os.getenv("OLLAMA_URL")
 
 
 if FILE_PATH:

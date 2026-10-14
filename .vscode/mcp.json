@@ -1,0 +1,34 @@
+{
+	"servers": {
+		"itcl-mcp-server": {
+			"type": "stdio",
+			"command": "uv",
+			"cwd": "${workspaceFolder}",
+			"args": [
+				"run",
+				"mcp_server/server.py"
+			]
+		},
+		"itcl-mcp-server-http": {
+			"type": "http",
+			"url": "http://localhost:8000/mcp"
+		},
+		"itcl-mcp-server-debug": {
+			"type": "stdio",
+			"command": "uv",
+			"cwd": "${workspaceFolder}",
+			"args": [
+				"run",
+				"--",
+				"python",
+				"-m",
+				"debugpy",
+				"--listen",
+				"0.0.0.0:5678",
+				"mcp_server/server.py"
+			]
+		}
+		
+	},
+	"inputs": []
+}

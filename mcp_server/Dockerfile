@@ -2,17 +2,18 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Copiamos requirements específicos de mcp_server
+# Instalar dependencias
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copiamos código
-COPY . .
+# Copiar el código
+COPY . /app/mcp_server
 
-# PYTHONPATH para imports con "mcp_server.*"
+# Configurar el entorno para encontrar el paquete mcp_server
 ENV PYTHONPATH=/app
 
-EXPOSE 8081
+# Exponer el puerto del server MCP
+EXPOSE 8000
 
-# Ejecutar server
-CMD ["python", "-m", "mcp_server.server"]
+# Ejecutar usando el módulo para evitar problemas de path
+CMD ["uvicorn", "mcp_server.server:app", "--host", "0.0.0.0", "--port", "8000"]
